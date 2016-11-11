@@ -1,12 +1,10 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-ENV['VAGRANT_NO_PARALLEL'] = 'yes'
 system(" set -x ; sudo ./setup_demo_network.sh #{ARGV.join(' ')}")
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "centos-7.0-x86_64"
-  config.vm.box_url = "http://cloud.centos.org/centos/7/vagrant/x86_64/images/CentOS-7-x86_64-Vagrant-1601_01.LibVirt.box"
+  config.vm.box = "centos/7"
   config.ssh.insert_key = false
   config.hostmanager.enabled = true
   config.hostmanager.manage_host = true
