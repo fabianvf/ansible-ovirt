@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-system(" set -x ; sudo ./setup_demo_network.sh #{ARGV.join(' ')}")
+ENV['VAGRANT_NO_PARALLEL'] = 'yes'
 
 Vagrant.configure("2") do |config|
   config.vm.box = "centos/7"
@@ -19,25 +19,25 @@ Vagrant.configure("2") do |config|
 
   config.vm.define :x1 do |x1|
     x1.vm.hostname = 'x1'
-    x1.vm.network :public_network, :type => 'bridge', :dev=> 'virbr40', :mac => "12:11:22:33:44:55"
+    x1.vm.network :private_network, :mac => "52:11:22:33:44:41", :ip => '192.168.33.11'
     x1.hostmanager.aliases = %w(x1.example.org)
   end
 
   config.vm.define :x2 do |x2|
     x2.vm.hostname = 'x2'
-    x2.vm.network :public_network, :type => 'bridge', :dev=> 'virbr40', :mac => "12:11:22:33:44:56"
+    x2.vm.network :private_network, :mac => "52:11:22:33:44:42", :ip => '192.168.33.12'
     x2.hostmanager.aliases = %w(x2.example.org)
   end
 
   config.vm.define :x3 do |x3|
     x3.vm.hostname = 'x3'
-    x3.vm.network :public_network, :type => 'bridge', :dev=> 'virbr40', :mac => "12:11:22:33:44:57"
+    x3.vm.network :private_network, :mac => "52:11:22:33:44:43", :ip => '192.168.33.13'
     x3.hostmanager.aliases = %w(x3.example.org)
   end
 
   config.vm.define :nfs do |nfs|
     nfs.vm.hostname = 'nfs'
-    nfs.vm.network :public_network, :type => 'bridge', :dev=> 'virbr40', :mac => "12:11:22:33:44:58"
+    nfs.vm.network :private_network, :mac => "52:11:22:33:44:44", :ip => '192.168.33.14'
     nfs.hostmanager.aliases = %w(nfs.example.org)
     nfs.vm.provision :shell, :path => "setup_nfs_shares.sh"
     nfs.vm.provider :libvirt do |libvirt|

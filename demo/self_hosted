@@ -1,7 +1,7 @@
 [self_hosted_first_host]
-x1.example.org host_id=1 mac_address=12:11:22:33:44:55
+x1.example.org host_id=1 mac_address=52:11:22:33:44:41
 
 
 [self_hosted_additional_hosts]
-x2.example.org host_id=2 mac_address=12:11:22:33:44:56
-x3.example.org host_id=3 mac_address=12:11:22:33:44:57
+x2.example.org host_id=2 mac_address=52:11:22:33:44:42
+x3.example.org host_id=3 mac_address=52:11:22:33:44:43
