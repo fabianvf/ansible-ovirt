@@ -14,7 +14,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision :shell, :path => "centos_7_x.sh"
 
   if Vagrant.has_plugin?("vagrant-cachier")
-    config.cache.scope = :machine
+    config.cache.scope = :box
   end
 
   config.vm.define :x1 do |x1|
