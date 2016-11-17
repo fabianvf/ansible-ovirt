@@ -1,4 +1,6 @@
 ---
+- name: Remove ebtables
+  yum: name=ebtables state=absent
 
 - name: Install dependences (~2GB)
   yum: name={{ item }} state=present
