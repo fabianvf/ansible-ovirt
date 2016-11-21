@@ -1,0 +1,33 @@
+---
+
+- name: ensure the script directory exists
+  file:
+    path: '{{ config_dir }}/scripts'
+    state: directory
+    recurse: yes
+    mode: 0700
+  tags:
+    - final
+
+- name: copy datacenter status checking script
+  copy:
+    src: files/datacenter_status
+    dest: '{{ config_dir }}/scripts/datacenter_status'
+    mode: 0700
+  tags:
+    - final
+
+- name: wait for datacenter to enter up status
+  command: >
+    {{ config_dir }}/scripts/datacenter_status  --url='https://{{ engine_fqdn }}/ovirt-engine/api'
+                                                --username='{{ engine_username }}'
+                                                --password='{{ admin_password }}'
+                                                --datacenter='{{ dc_name }}'
+  register: dc_status
+  until: dc_status.stdout == 'up'
+  retries: '{{ retries }}'
+  delay: '{{ delay }}'
+  failed_when: dc_status.rc > 0
+  tags:
+    - final
+

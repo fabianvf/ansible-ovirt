@@ -22,3 +22,11 @@
     - { role: subscription, when: '{{ repositories|length > 0 }}'}
     - wait_for_yum_lock
     - self_hosted_additional_host
+
+- hosts: self_hosted_first_host
+  remote_user: root
+  gather_facts: no
+  roles:
+    - wait_for_host_up
+    - { role: wait_for_engine, tags: ['config'] }
+    - wait_for_datacenter

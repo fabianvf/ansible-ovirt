@@ -1,0 +1,11 @@
+---
+
+
+config_dir: /etc/ansible-ovirt
+engine_fqdn: ovirt-engine.example.com
+engine_username: admin@internal
+admin_password: changeme
+dc_name: Default
+
+retries: 120
+delay: 5
