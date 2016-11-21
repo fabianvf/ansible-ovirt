@@ -1,20 +1,10 @@
 #! /usr/bin/env python
 
 import time
-from ovirtsdk.api import API
-from ovirtsdk.xml import params
-from ovirtsdk.infrastructure.errors import RequestError
+from ovirtsdk4 import Connection
+from ovirtsdk4 import types
 
 
-def debug(f):
-    def inner(*args, **kwargs):
-        import ipdb
-        with ipdb.launch_ipdb_on_exception():
-            return f(*args, **kwargs)
-    return inner
-
-
-# @debug
 def main():
     args = parse_args()
     engine_api = get_api(
@@ -23,7 +13,10 @@ def main():
         password=args.password,
         insecure=True
     )
-    datacenter = engine_api.datacenters.get(args.dc_name)
+    system_service = engine_api.system_service()
+    dcs_service = system_service.data_centers_service()
+    datacenter = get_resource(dcs_service, args.dc_name)
+    host = get_running_host(system_service.hosts_service())
 
     storage = {
         'storage_type': args.storage_type,
@@ -35,12 +28,12 @@ def main():
     }
 
     print("Creating {} storage domain".format(storage['domain_type']))
-    storage_domain = create_storage_domain(engine_api, storage, datacenter)
+    storage_domain = create_storage_domain(system_service.storage_domains_service(), storage, datacenter, host)
 
     try:
-        attach_storage_domain(engine_api, storage_domain, datacenter)
-    except RequestError as e:
-        if e.status != 409:
+        attach_storage_domain(dcs_service.data_center_service(datacenter.id).storage_domains_service(), storage_domain)
+    except Exception as e:
+        if '409' not in ' '.join(e.args):
             raise
 
 
@@ -82,7 +75,7 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
     start = time.time()
     while time.time() - start < timeout:
         try:
-            return API(
+            return Connection(
                 url=url,
                 username=user,
                 password=password,
@@ -92,37 +85,46 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
             time.sleep(10)
 
 
-def create_storage_domain(engine_api, storage, datacenter):
-    storage_params = params.Storage(
-        type_=storage['storage_type'],
+def get_resource(service, name):
+    try:
+        resource = service.list(search='name={}'.format(name))
+    except TypeError:
+        # Not all resource types allow the search parameter
+        # In this case, will have to manually filter
+        resource = list(filter(lambda x: x.name == name, service.list()))
+    return resource[0] if resource else None
+
+
+def create_storage_domain(storage_service, storage, datacenter, host):
+    storage_types = types.HostStorage(
+        type=types.StorageType(storage['storage_type']),
         vfs_type=storage['storage_type'],
         address=storage['address'],
         path=storage['path'],
     )
-    sd_params = params.StorageDomain(
+    sd_types = types.StorageDomain(
         name=storage['name'],
         data_center=datacenter,
-        type_=storage['domain_type'],
-        host=get_running_host(engine_api),
-        storage=storage_params
+        type=types.StorageDomainType(storage['domain_type']),
+        host=host,
+        storage=storage_types
     )
-    return (engine_api.storagedomains.get(name=storage['name']) or
-          engine_api.storagedomains.add(sd_params))
+    return (get_resource(storage_service, name=storage['name']) or
+          storage_service.add(sd_types))
 
 
-def attach_storage_domain(engine_api, storage_domain, datacenter):
-    if storage_domain.status and storage_domain.status.state == 'unattached':
+def attach_storage_domain(sds_service, storage_domain):
+    if storage_domain.status and storage_domain.status != types.StorageDomainStatus.UNATTACHED:
         print('Storage domain exists and is attached')
-    elif datacenter.storagedomains.add(storage_domain):
+    elif sds_service.add(types.StorageDomain(id=storage_domain.id)):
         print('Domain was attached successfully')
 
 
-def get_running_host(engine_api):
-    host_list = engine_api.hosts.list()
-    for host in host_list:
-        # should add condition to match configured cluster as well
-        if host.status.state == 'up':
-            return host
+def get_running_host(hosts_service):
+    # TODO: Verify cluster matches as well
+    hosts = hosts_service.list(search='status=up')
+    if hosts:
+        return hosts[0]
     print('Failed to found a host in "up" state')
     exit(1)
 

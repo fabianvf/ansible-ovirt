@@ -1,11 +1,9 @@
 #! /usr/bin/env python
 
 import time
-from ovirtsdk.api import API
-from ovirtsdk.xml import params
-from ovirtsdk.infrastructure.errors import RequestError
 
-VERSION = params.Version(major='3', minor='6')
+from ovirtsdk4 import Connection
+from ovirtsdk4 import types
 
 
 def main():
@@ -16,19 +14,21 @@ def main():
         password=args.password,
         insecure=True
     )
+    system_service = engine_api.system_service()
 
     print "Creating DataCenter"
-    datacenter = create_datacenter(engine_api, args.dc_name)
+    dcs_service = system_service.data_centers_service()
+    datacenter = create_datacenter(dcs_service, args.dc_name)
     if args.mac_address_range and args.mac_pool_name:
         print('Creating mac address pool')
         mac_pool = create_mac_pool(
-            engine_api,
+            system_service.mac_pools_service(),
             args.mac_pool_name,
             args.mac_address_range
         )
-        assign_mac_pool(datacenter, mac_pool)
+        assign_mac_pool(dcs_service, datacenter, mac_pool)
     print("Creating Cluster")
-    create_cluster(engine_api, datacenter, args.cluster_name, args.cpu_type)
+    create_cluster(system_service.clusters_service(), datacenter, args.cluster_name, args.cpu_type)
 
 
 def parse_args():
@@ -68,7 +68,7 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
     start = time.time()
     while time.time() - start < timeout:
         try:
-            return API(
+            return Connection(
                 url=url,
                 username=user,
                 password=password,
@@ -79,74 +79,81 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
             time.sleep(10)
 
 
-def create_datacenter(engine_api, name):
-    dc_params = params.DataCenter(
+def get_resource(service, name):
+    try:
+        resource = service.list(search='name={}'.format(name))
+    except TypeError:
+        # Not all resource types allow the search parameter
+        # In this case, will have to manually filter
+        resource = list(filter(lambda x: x.name == name, service.list()))
+    return resource[0] if resource else None
+
+
+def create_datacenter(dcs_service, name):
+    dc_types = types.DataCenter(
         name=name,
-        storage_type='nfs',
-        version=VERSION
+        local=False,
     )
     try:
-        return (engine_api.datacenters.get(name=name) or
-                engine_api.datacenters.add(dc_params))
+        return (get_resource(dcs_service, name) or
+                dcs_service.add(dc_types))
     except Exception as e:
         print 'Failed to create NFS Data Center:\n%s' % str(e)
         exit(1)
 
 
-def create_mac_pool(engine_api, mac_pool_name, mac_address_range):
+def create_mac_pool(pools_service, mac_pool_name, mac_address_range):
     try:
         start, end = mac_address_range.split(',')
     except Exception:
         print('Mac address range specified in an invalid format')
         exit(1)
 
-    ranges = params.Ranges(range=[params.Range(from_=start, to=end)])
-
-    mac_pool_params = params.MacPool(
+    mac_pool_types = types.MacPool(
         name=mac_pool_name,
-        ranges=ranges
+        ranges=[types.Range(from_=start, to=end)]
     )
 
     try:
-        return (engine_api.macpools.get(name=mac_pool_name) or
-                engine_api.macpools.add(mac_pool_params))
-    except RequestError as e:
+        return (get_resource(pools_service, mac_pool_name) or
+                pools_service.add(mac_pool_types))
+    except Exception as e:
         print('Error creating mac address pool')
         print(e.detail)
         exit(1)
 
 
-def assign_mac_pool(datacenter, pool):
+def assign_mac_pool(dcs_service, datacenter, pool):
+    dc_service = dcs_service.data_center_service(datacenter.id)
+    exception = None
     for _ in range(6):
         try:
-            datacenter.set_mac_pool(pool)
-            datacenter.update()
+            dc_service.update(types.DataCenter(mac_pool=pool))
             print('Successfully attached mac address pool to Datacenter')
             break
         except Exception as e:
+            exception = e
             time.sleep(10)
     else:
-        print('Failed to assign mac address pool to Datacenter')
-        print(e.detail)
+        print('Failed to assign mac address pool to Datacenter\n{}'.format(str(e)))
         exit(1)
 
 
-def create_cluster(engine_api, datacenter, cluster_name, cpu_type):
-    cpu_params = params.CPU(id=cpu_type)
-    cluster_params = params.Cluster(
+def create_cluster(clusters_service, datacenter, cluster_name, cpu_type):
+    cpu_types = types.Cpu(type=cpu_type)
+    cluster_types = types.Cluster(
         name=cluster_name,
-        cpu=cpu_params,
+        cpu=cpu_types,
         data_center=datacenter,
-        version=VERSION
     )
     try:
-        cluster = engine_api.clusters.get(name=cluster_name)
+        cluster = get_resource(clusters_service, name=cluster_name)
         if cluster:
+            cluster_service = clusters_service.cluster_service(cluster.id)
             print 'Cluster: ' + cluster.name + ' already exists'
             print "Setting CPU type to '%s'" % cpu_type
-            cluster.set_cpu(cpu_params)
-            cluster.update()
-        elif engine_api.clusters.add(cluster_params):
+            cluster_service.update(types.Cluster(cpu=cpu_types))
+        elif clusters_service.add(cluster_types):
             print 'Cluster was created successfully'
     except Exception as e:
         print 'Failed to create Cluster:\n%s' % str(e)

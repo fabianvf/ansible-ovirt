@@ -1,19 +1,10 @@
 #! /usr/bin/env python
 
 import time
-from ovirtsdk.api import API
-from ovirtsdk.xml import params
+from ovirtsdk4 import Connection
+from ovirtsdk4 import types
 
 
-def debug(f):
-    def inner(*args, **kwargs):
-        import ipdb
-        with ipdb.launch_ipdb_on_exception():
-            return f(*args, **kwargs)
-    return inner
-
-
-# @debug
 def main():
     args = parse_args()
     engine_api = get_api(
@@ -22,9 +13,15 @@ def main():
         password=args.password,
         insecure=True
     )
+    system_service = engine_api.system_service()
+    hosts_service = system_service.hosts_service()
+    cluster = get_resource(system_service.clusters_service(), args.cluster)
+    if not cluster:
+        print('Cluster with name {} does not exist'.format(args.cluster))
+        exit(1)
 
-    add_host(engine_api, args.host, args.cluster, args.host_password)
-    wait_for_vdsm_host_up(engine_api, args.host)
+    host = add_host(hosts_service, args.host, cluster, args.host_password)
+    wait_for_vdsm_host_up(hosts_service.host_service(host.id))
 
 
 def parse_args():
@@ -59,7 +56,7 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
     start = time.time()
     while time.time() - start < timeout:
         try:
-            return API(
+            return Connection(
                 url=url,
                 username=user,
                 password=password,
@@ -69,33 +66,41 @@ def get_api(url=None, user=None, password=None, insecure=False, timeout=30):
             time.sleep(10)
 
 
-def add_host(engine_api, host, cluster_name, password):
-    host_params = params.Host(
+def get_resource(service, name):
+    try:
+        resource = service.list(search='name={}'.format(name))
+    except TypeError:
+        # Not all resource types allow the search parameter
+        # In this case, will have to manually filter
+        resource = list(filter(lambda x: x.name == name, service.list()))
+    return resource[0] if resource else None
+
+
+def add_host(hosts_service, host, cluster, password):
+    host_types = types.Host(
         name=host,
         address=host,
-        cluster=engine_api.clusters.get(cluster_name),
+        cluster=cluster,
         root_password=password,
         override_iptables=True
     )
 
-    installed_host = (engine_api.hosts.get(name=host) or
-                      engine_api.hosts.add(host_params))
-
-    return installed_host
+    return (get_resource(hosts_service, host) or
+            hosts_service.add(host_types))
 
 
-def wait_for_vdsm_host_up(engine_api, host, retries=600, delay=5):
+def wait_for_vdsm_host_up(host_service, retries=60, delay=5):
     for i in range(retries):
         state = None
         try:
-            state = engine_api.hosts.get(host).status.state
+            host = host_service.get()
         except Exception as e:
             print 'Error fetching host state: {}'.format(e)
         else:
-            print 'VDSM host in {state} state'.format(state=state)
-            if 'failed' in state:
+            print 'VDSM host in {state} state'.format(state=host.status.value)
+            if host.status in [types.HostStatus.INSTALL_FAILED, types.HostStatus.NON_RESPONSIVE]:
                 raise Exception('The VDSM host was found in a failed state. Please check engine and bootstrap installation logs.')
-            elif state == 'up':
+            elif host.status == types.HostStatus.UP:
                 print 'The VDSM Host is now operational'
                 return True
 
