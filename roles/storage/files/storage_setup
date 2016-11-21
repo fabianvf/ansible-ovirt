@@ -114,7 +114,7 @@ def create_storage_domain(storage_service, storage, datacenter, host):
 
 
 def attach_storage_domain(sds_service, storage_domain):
-    if storage_domain.status and storage_domain.status != types.StorageDomainStatus.UNATTACHED:
+    if storage_domain.status and storage_domain.status == types.StorageDomainStatus.ACTIVE:
         print('Storage domain exists and is attached')
     elif sds_service.add(types.StorageDomain(id=storage_domain.id)):
         print('Domain was attached successfully')
