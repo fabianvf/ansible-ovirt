@@ -4,6 +4,7 @@
   yum: name={{ item }} state=present
   with_items:
       - '{{ "ovirt-engine" if ansible_distribution == "CentOS" else "rhevm" }}'
+      - python-ovirt-engine-sdk4
       - glusterfs-fuse
       - python-enum34
   async: 3600

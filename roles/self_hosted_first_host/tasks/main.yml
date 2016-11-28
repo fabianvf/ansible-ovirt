@@ -9,6 +9,7 @@
       - '{{ "ovirt-engine-appliance" if ansible_distribution == "CentOS" else "rhevm-appliance" }}'
       - glusterfs-fuse
       - ovirt-hosted-engine-setup
+      - python-ovirt-engine-sdk4
       - ebtables-2.0.10-13.el7.x86_64
   async: 7200
   poll: 60
