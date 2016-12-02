@@ -1,6 +1,7 @@
 {
   "data_storage_address": "nfs.example.org",
   "data_storage_path": "/nfs_data/ovirt_storage",
+  "data_storage_name": "my_data_storage",
   "export_storage_address": "nfs.example.org",
   "export_storage_path": "/nfs_data/export",
   "hosted_storage_address": "nfs.example.org",
@@ -12,5 +13,7 @@
   "gateway": "192.168.33.1",
   "mac_address_range": "00:11:23:00:00:00,00:11:23:FF:FF:FF",
   "mac_pool_name": "macncheese",
-  "create_export_domain": "true"
+  "create_export_domain": "true",
+  "admin_password": "changeme",
+  "cluster_name": "Default"
 }

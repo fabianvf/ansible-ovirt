@@ -17,6 +17,12 @@ if  ! [ $scenario == 'self_hosted' ]  && ! [ $scenario == 'engine_and_hypervisor
   exit 1
 fi
 
+if [ $scenario == 'self_hosted' ]; then
+   engine_host='ovirt-engine.example.org'
+elif [ $scenario == 'engine_and_hypervisor' ] ; then
+   engine_host='x1.example.org'
+fi
+
 (set -x
 cd demo
 
@@ -36,4 +42,12 @@ sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.12' ><hostname>x2
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.13' ><hostname>x3.example.org</hostname></host>" --live --config
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.14' ><hostname>nfs.example.org</hostname></host>" --live --config
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.15' ><hostname>ovirt-engine.example.org</hostname></host>" --live --config)
-) &&  ansible-playbook $scenario.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant
+) &&  ansible-playbook $scenario.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant &&
+# DO WORK TO GET OVF WHERE IT NEEDS TO BE
+scp rhel7.ovf root@$engine_host:~/ &&
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$engine_host -t 'ovirt-image-uploader upload -e my_export_storage rhel7.ovf' &&
+
+ansible-playbook launch_vms.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant -e '{"ssh_key": "$(cat ~/.ssh/id_rsa.pub)"}'
+
+echo "To retry launching the vms, just run:"
+echo "ansible-playbook launch_vms.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant -e '{\"ssh_key\": \"\$(cat ~/.ssh/id_rsa.pub)\"}'"

@@ -1,6 +1,9 @@
 {
   "data_storage_address": "nfs.example.org",
   "data_storage_path": "/nfs_data/ovirt_storage",
+  "data_storage_name": "my_data_storage",
+  "admin_password": "changeme",
+  "cluster_name": "Default",
   "export_storage_address": "nfs.example.org",
   "export_storage_path": "/nfs_data/export",
   "hosted_storage_address": "nfs.example.org",

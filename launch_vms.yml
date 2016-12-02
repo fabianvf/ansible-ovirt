@@ -1,0 +1,84 @@
+---
+
+- hosts: engine
+  remote_user: root
+  vars:
+    start: 1
+    end: 3
+    disk_size: 15GiB
+    memory: 512MiB
+    vm_template: 'rhel7'
+    ssh_key: 'CHANGEME'
+  pre_tasks:
+    - name: autenticate to engine
+      ovirt_auth:
+        username: '{{ engine_username }}'
+        password: '{{ admin_password }}'
+        url: https://{{ engine_fqdn }}/ovirt-engine/api
+        insecure: true
+
+    - name: remove disks
+      ovirt_disks:
+        name: cloud-init-{{item}}-disk
+        vm_name: cloud-init-{{item}}
+        state: absent
+        auth: '{{ ovirt_auth }}'
+        wait: true
+      with_sequence: start={{start}} end={{end}}
+      failed_when: false
+
+    - name: remove vms
+      ovirt_vms:
+        name: cloud-init-{{item}}
+        state: absent
+        wait: true
+        auth: '{{ ovirt_auth }}'
+      with_sequence: start={{start}} end={{end}}
+
+    - name: launch vms
+      ovirt_vms:
+        name: cloud-init-{{item}}
+        template: '{{ vm_template }}'
+        cluster: '{{ cluster_name }}'
+        memory: '{{ memory }}'
+        cloud_init:
+          host_name: cloud-init-{{item}}
+          user_name: root
+          root_password: changeme
+          nic_boot_protocol: DHCP
+          nic_name: eth0
+          nic_on_boot: true
+          authorized_ssh_keys: '{{ ssh_key }}'
+        cpu_cores: 2
+        # disks:
+        #   - name: cloud-init-{{item}}-disk
+        nics:
+          - name: eth0
+            profile_name: ovirtmgmt
+        state: running
+        wait: true
+        auth: '{{ ovirt_auth }}'
+      register: vms
+      async: 3600
+      with_sequence: start={{start}} end={{end}}
+
+    - name: Wait for vms to complete
+      async_status: jid={{item.ansible_job_id}}
+      register: vms_jobs
+      until: vms_jobs.finished
+      retries: 300
+      with_items: '{{ vms.results }}'
+
+    - name: create and attach disks
+      ovirt_disks:
+        name: cloud-init-{{item}}-disk
+        vm_name: cloud-init-{{item}}
+        state: present
+        format: cow
+        size: '{{ disk_size }}'
+        auth: '{{ ovirt_auth }}'
+        wait: true
+        storage_domain: '{{ data_storage_name }}'
+        interface: virtio
+      with_sequence: start={{start}} end={{end}}
+
