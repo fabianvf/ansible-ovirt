@@ -42,12 +42,13 @@ sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.12' ><hostname>x2
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.13' ><hostname>x3.example.org</hostname></host>" --live --config
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.14' ><hostname>nfs.example.org</hostname></host>" --live --config
 sudo virsh net-update demo0 add dns-host "<host ip='192.168.33.15' ><hostname>ovirt-engine.example.org</hostname></host>" --live --config)
-) &&  ansible-playbook $scenario.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant &&
+); true && (set -x;  ansible-playbook $scenario.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant ;
 # DO WORK TO GET OVF WHERE IT NEEDS TO BE
-scp rhel7.ovf root@$engine_host:~/ &&
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$engine_host -t 'ovirt-image-uploader upload -e my_export_storage rhel7.ovf' &&
+scp  -i /usr/share/vagrant/keys/vagrant -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no rhel7.ovf root@$engine_host:~/ &&
+ssh -i /usr/share/vagrant/keys/vagrant -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@$engine_host -t 'ovirt-image-uploader upload -e my_export_storage rhel7.ovf -N rhel7' &&
+../fusor_ovirt/bin/ovirt_import_template.py --api_user 'admin@internal' --api_pass changeme --api_host $engine_host --cluster_name Default --data_center_name Default --export_domain_name my_export_storage --storage_domain_name my_data_storage --vm_template_name rhel7 &&
 
-ansible-playbook launch_vms.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant -e '{"ssh_key": "$(cat ~/.ssh/id_rsa.pub)"}'
+ansible-playbook launch_vms.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant -e '{"ssh_key": "$(cat ~/.ssh/id_rsa.pub)"}')
 
 echo "To retry launching the vms, just run:"
 echo "ansible-playbook launch_vms.yml -e @demo/$scenario.json -i demo/$scenario --private-key=/usr/share/vagrant/keys/vagrant -e '{\"ssh_key\": \"\$(cat ~/.ssh/id_rsa.pub)\"}'"
