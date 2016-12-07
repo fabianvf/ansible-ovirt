@@ -26,7 +26,7 @@ chattr +i /etc/resolv.conf
 cp -R /home/vagrant/.ssh /root/.ssh
 
 # Enable ovirt.org repository
-yum install -y http://resources.ovirt.org/pub/yum-repo/ovirt-release40.rpm
+yum install -y http://resources.ovirt.org/pub/yum-repo/ovirt-release40-pre.rpm
 
 )
 

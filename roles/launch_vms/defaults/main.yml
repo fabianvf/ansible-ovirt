@@ -1,0 +1,23 @@
+---
+
+config_dir: /etc/ansible-ovirt
+
+engine_fqdn: ovirt-engine.example.com
+engine_username: admin@internal
+admin_password: changeme
+root_password: changeme
+
+ssh_key: changeme
+
+# Leaving VMs undefined for now, but this is the format
+# you should use to specify a VM. Multiple entries will
+# create multiple VMs
+# vms:
+#   - name: myvm
+#     disk:
+#       name: mydisk
+#       size: 15
+#     image_path: '/dev/null'
+#     memory: 1024MiB
+#     os: rhel_7x64
+#     cpus: 2

@@ -1,0 +1,149 @@
+#! /usr/bin/env python
+
+import os
+import ssl
+import time
+from urlparse import urlparse
+from httplib import HTTPSConnection
+
+from ovirtsdk4 import Connection, types
+
+MB_per_request = 32
+
+def main():
+    args = parse_args()
+    api = Connection(
+        url=args.url,
+        username=args.username,
+        password=args.password,
+        insecure=True
+    )
+
+    system_service = api.system_service()
+    transfers_service = system_service.image_transfers_service()
+    disks_service = system_service.disks_service()
+
+    disk = create_disk(disks_service, args.disk_name, args.disk_size,  args.storage_domain)
+    wait_for_disk(disks_service, disk)
+    transfer_image(transfers_service, disk.id, args.image_path)
+    wait_for_disk(disks_service, disk)
+
+
+def create_disk(disks_service, disk_name, disk_size, storage_domain):
+    disk = disks_service.add(
+        types.Disk(
+            name=disk_name,
+            bootable=True,
+            active=True,
+            description='Template disk for creating rhel7 VMs',
+            format=types.DiskFormat.COW,
+            provisioned_size=disk_size * 2**30,
+            storage_domains=[
+                types.StorageDomain(
+                    name=storage_domain
+                )
+            ]
+        )
+    )
+    # Wait till the disk is completely created:
+    disk_service = disks_service.disk_service(disk.id)
+
+    return disk_service.get()
+
+
+def wait_for_disk(disks_service, disk):
+    disk_service = disks_service.disk_service(disk.id)
+    while disk.status != types.DiskStatus.OK:
+        time.sleep(5)
+        disk = disk_service.get()
+    return disk
+
+
+def transfer_image(transfers_service, disk_id, image_path):
+    transfer = transfers_service.add(
+        types.ImageTransfer(
+            image=types.Image(
+                id=disk_id
+            )
+        )
+    )
+
+    transfer_service = transfers_service.image_transfer_service(transfer.id)
+    while transfer.phase == types.ImageTransferPhase.INITIALIZING:
+        time.sleep(3)
+        transfer = transfer_service.get()
+
+    upload_headers = {
+        'Authorization':  transfer.signed_ticket
+    }
+
+    # Extract the URI, port, and path from the transfer's proxy_url.
+    url = urlparse(transfer.proxy_url)
+
+    # Create a new instance of the connection.
+    proxy_connection = HTTPSConnection(
+        url.hostname,
+        url.port,
+        context=ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+    )
+
+    bytes_header = "bytes {}-{}/{}".format
+    with open(image_path, "rb") as disk:
+        size = os.path.getsize(image_path)
+        chunk_size = 1024*1024*MB_per_request
+        pos = 0
+        while (pos < size):
+            transfer_service.extend()
+
+            upload_headers['Content-Range'] = bytes_header(
+                pos,
+                min(pos + chunk_size, size)-1,
+                size
+            )
+            proxy_connection.request(
+                'PUT',
+                url.path,
+                disk.read(chunk_size),
+                headers=upload_headers
+            )
+            r = proxy_connection.getresponse()
+            progress = pos / float(size)
+            print(r.status, r.reason, "Progress: ", "{:.0%}".format(progress))
+            pos += chunk_size
+
+    transfer_service.finalize()
+
+
+def parse_args():
+    from optparse import OptionParser
+    parser = OptionParser()
+
+    parser.add_option('--url', dest='url',
+                      help='the url for the Engine api')
+    parser.add_option('--username', dest='username',
+                      help='the username for the Engine api')
+    parser.add_option('--password', dest='password',
+                      help='the password for the Engine api')
+    parser.add_option('--disk-name', dest='disk_name',
+                      help='The desired name of the created disk')
+    parser.add_option('--disk-size', dest='disk_size', type='int',
+                      help='the desired size of the created disk (in GiB)')
+    parser.add_option('--image', dest='image_path',
+                      help='the path to the image you are uploading')
+    parser.add_option('--storage-domain', dest='storage_domain',
+                      help='the name of the storage domain for the disk')
+    (options, args) = parser.parse_args()
+
+    if not all(options.__dict__.values()):
+        print('Not all required options were provided')
+        actual = [key for (key, value) in options.__dict__.items() if value]
+        print('Got: {}'.format(', '.join(actual)))
+        print('Expected: {}'.format(', '.join(options.__dict__.keys())))
+        exit(1)
+    actual = [key for (key, value) in options.__dict__.items() if value]
+    print('Got: {}'.format(', '.join(actual)))
+    return options
+
+
+if __name__ == '__main__':
+    main()

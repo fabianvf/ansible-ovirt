@@ -1,0 +1,71 @@
+---
+
+- name: ensure the script directory exists
+  file:
+    path: '{{ config_dir }}/scripts'
+    state: directory
+    recurse: yes
+    mode: 0700
+
+- name: copy storage setup script
+  copy:
+    src: files/upload_image
+    dest: '{{ config_dir }}/scripts/upload_image'
+    mode: 0700
+
+- name: create rhel7 guest image disks
+  command: >
+    '{{ config_dir }}'/scripts/upload_image --url='https://{{ engine_fqdn }}/ovirt-engine/api'
+                                      --username='{{ engine_username }}'
+                                      --password='{{ admin_password }}'
+                                      --disk-name='{{ item.disk.name }}'
+                                      --disk-size={{ item.disk.size }}
+                                      --image={{ item.image_path }}
+                                      --storage-domain='{{ data_storage_name }}'
+  register: disks
+  async: 3600
+  with_items: '{{ vms }}'
+
+- name: Wait for disks to complete
+  async_status: jid={{ item.ansible_job_id }}
+  register: disks_jobs
+  until: disks_jobs.finished
+  retries: 300
+  with_items: '{{ disks.results }}'
+
+- name: launch vms
+  ovirt_vms:
+    name: '{{ item.name }}'
+    cluster: '{{ cluster_name }}'
+    memory: '{{ item.memory }}'
+    memory_guaranteed: '{{ item.memory }}'
+    cloud_init:
+      host_name: '{{ item.name }}'
+      user_name: root
+      root_password: '{{ root_password }}'
+      nic_boot_protocol: DHCP
+      nic_name: eth0
+      nic_on_boot: true
+      authorized_ssh_keys: '{{ ssh_key }}'
+    cpu_cores: '{{ item.cpus }}'
+    disks:
+      - name: '{{ item.disk.name }}'
+        bootable: true
+        activate: true
+    nics:
+      - name: eth0
+        profile_name: ovirtmgmt
+    state: present
+    wait: true
+    auth: '{{ ovirt_auth }}'
+  register: vm_jobs
+  async: 3600
+  with_items: '{{ vms }}'
+
+- name: Wait for vms to complete
+  async_status: jid={{ item.ansible_job_id }}
+  register: vms_job_results
+  until: vms_job_results.finished
+  retries: 300
+  with_items: '{{ vm_jobs.results }}'
+
