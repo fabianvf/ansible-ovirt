@@ -1,6 +1,7 @@
 ---
 
 - hosts: engine
+  strategy: debug
   remote_user: root
   pre_tasks:
     - name: authenticate to engine
@@ -9,45 +10,6 @@
         password: '{{ admin_password }}'
         url: https://{{ engine_fqdn }}/ovirt-engine/api
         insecure: true
-      # tags:
-      #   - reset
-
-    - name: remove disks
-      ovirt_disks:
-        name: '{{ item.disk.name }}'
-        vm_name: '{{ item.name }}'
-        state: absent
-        auth: '{{ ovirt_auth }}'
-        wait: true
-      with_items: '{{ vms }}'
-      failed_when: false
-      tags:
-        - reset
-
-    - name: remove vms
-      ovirt_vms:
-        name: '{{ item.name }}'
-        state: absent
-        wait: true
-        auth: '{{ ovirt_auth }}'
-      with_items: '{{ vms }}'
-      tags:
-        - reset
   roles:
     - wait_for_host_up
     - { role: launch_vms, when: '{{ vms is defined }}' }
-
-
-    # - name: create and attach disks
-    #   ovirt_disks:
-    #     name: cloud-init-{{item}}-disk
-    #     # vm_name: cloud-init-{{item}}
-    #     state: present
-    #     format: cow
-    #     size: '{{ disk_size }}'
-    #     auth: '{{ ovirt_auth }}'
-    #     wait: true
-    #     storage_domain: '{{ data_storage_name }}'
-    #     interface: virtio
-    #   with_sequence: start={{start}} end={{end}}
-

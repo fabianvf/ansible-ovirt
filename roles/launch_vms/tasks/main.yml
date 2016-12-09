@@ -13,59 +13,109 @@
     dest: '{{ config_dir }}/scripts/upload_image'
     mode: 0700
 
-- name: create rhel7 guest image disks
+- name: upload images
   command: >
     '{{ config_dir }}'/scripts/upload_image --url='https://{{ engine_fqdn }}/ovirt-engine/api'
                                       --username='{{ engine_username }}'
                                       --password='{{ admin_password }}'
-                                      --disk-name='{{ item.disk.name }}'
-                                      --disk-size={{ item.disk.size }}
-                                      --image={{ item.image_path }}
+                                      --disk-name='{{ item.1.name }}'
+                                      --disk-size={{ item.1.size }}
+                                      --image={{ item.1.image_path }}
                                       --storage-domain='{{ data_storage_name }}'
-  register: disks
+  register: image_upload_jobs
   async: 3600
-  with_items: '{{ vms }}'
+  with_subelements:
+    - '{{ vms }}'
+    - disks
+  when: item.1.get("image_path")
 
-- name: Wait for disks to complete
+- name: Wait for image uploads to complete
   async_status: jid={{ item.ansible_job_id }}
-  register: disks_jobs
-  until: disks_jobs.finished
+  register: image_upload_result
+  until: image_upload_result.finished
   retries: 300
-  with_items: '{{ disks.results }}'
+  when: item.get("ansible_job_id")
+  with_items: '{{ image_upload_jobs.results }}'
 
-- name: launch vms
+- name: create vms
   ovirt_vms:
     name: '{{ item.name }}'
     cluster: '{{ cluster_name }}'
     memory: '{{ item.memory }}'
     memory_guaranteed: '{{ item.memory }}'
+    cpu_cores: '{{ item.cpus }}'
+    nics:
+      - name: '{{ item.nic.name if item.get("nic") and item.nic.get("name") else "eth0" }}'
+        profile_name: '{{ item.nic.profile if item.get("nic") and item.nic.get("profile") else "ovirtmgmt" }}'
+        interface: '{{ item.nic.interface if item.get("nic") and item.nic.get("interface") else "virtio" }}'
+        mac_address: '{{ item.nic.mac if item.get("nic") and item.nic.get("mac") else None }}'
+    state: stopped
+    wait: true
+    auth: '{{ ovirt_auth }}'
+  register: vm_create_jobs
+  async: 3600
+  with_items: '{{ vms }}'
+
+- name: Wait for vms to be created
+  async_status: jid={{ item.ansible_job_id }}
+  register: vms_create_result
+  until: vms_create_result.finished
+  retries: 300
+  with_items: '{{ vm_create_jobs.results }}'
+
+- name: attach disks
+  ovirt_disks:
+    name: '{{ item.1.name }}'
+    bootable: '{{ item.1.bootable if item.1.get("bootable") else False }}'
+    format: '{{ item.1.format if item.1.get("format") else "cow"}}'
+    size: '{{ item.1.size }}GiB'
+    state: attached
+    interface: '{{ item.1.interface if item.1.get("interface") else "virtio" }}'
+    vm_name: '{{ item.0.name }}'
+    auth: '{{ ovirt_auth }}'
+    storage_domain: '{{ data_storage_name }}'
+  register: disk_attach_jobs
+  async: 3600
+  with_subelements:
+    - '{{ vms }}'
+    - disks
+
+- name: Wait for disks to be attached
+  async_status: jid={{ item.ansible_job_id }}
+  register: disk_attach_result
+  until: disk_attach_result.finished
+  retries: 300
+  with_items: '{{ disk_attach_jobs.results }}'
+
+- name: start vms
+  ovirt_vms:
+    auth: '{{ ovirt_auth }}'
+    name: '{{ item.name }}'
+    state: 'running'
+    nics:
+      - name: '{{ item.nic.name if item.get("nic") and item.nic.get("name") else "eth0" }}'
+        profile_name: '{{ item.nic.profile if item.get("nic") and item.nic.get("profile") else "ovirtmgmt" }}'
+        interface: '{{ item.nic.interface if item.get("nic") and item.nic.get("interface") else "virtio" }}'
+        mac_address: '{{ item.nic.mac if item.get("nic") and item.nic.get("mac") else None }}'
     cloud_init:
       host_name: '{{ item.name }}'
       user_name: root
       root_password: '{{ root_password }}'
-      nic_boot_protocol: DHCP
-      nic_name: eth0
+      nic_boot_protocol: '{{ item.nic.boot_protocol if item.get("nic") and item.nic.get("boot_protocol") else "DHCP" }}'
+      nic_name: '{{ item.nic.name if item.get("nic") and item.nic.get("name") else "eth0" }}'
+      nic_ip_address: '{{ item.nic.ip if item.get("nic") and item.nic.get("boot_protocol") == "static" else None }}'
+      nic_gateway: '{{ item.nic.gateway if item.get("nic") and item.nic.get("boot_protocol") == "static" else None }}'
+      nic_netmask: '{{ item.nic.netmask if item.get("nic") and item.nic.get("boot_protocol") == "static" else None }}'
       nic_on_boot: true
       authorized_ssh_keys: '{{ ssh_key }}'
-    cpu_cores: '{{ item.cpus }}'
-    disks:
-      - name: '{{ item.disk.name }}'
-        bootable: true
-        activate: true
-    nics:
-      - name: eth0
-        profile_name: ovirtmgmt
-    state: present
-    wait: true
-    auth: '{{ ovirt_auth }}'
-  register: vm_jobs
+
+  register: vm_start_jobs
   async: 3600
   with_items: '{{ vms }}'
 
-- name: Wait for vms to complete
+- name: Wait for vms to come up
   async_status: jid={{ item.ansible_job_id }}
-  register: vms_job_results
-  until: vms_job_results.finished
+  register: vm_start_result
+  until: vm_start_result.finished
   retries: 300
-  with_items: '{{ vm_jobs.results }}'
-
+  with_items: '{{ vm_start_jobs.results }}'

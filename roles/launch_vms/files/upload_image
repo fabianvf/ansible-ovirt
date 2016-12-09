@@ -24,13 +24,27 @@ def main():
     disks_service = system_service.disks_service()
 
     disk = create_disk(disks_service, args.disk_name, args.disk_size,  args.storage_domain)
-    wait_for_disk(disks_service, disk)
-    transfer_image(transfers_service, disk.id, args.image_path)
-    wait_for_disk(disks_service, disk)
+    try:
+        wait_for_disk(disks_service, disk)
+        transfer_image(transfers_service, disk.id, args.image_path)
+        wait_for_disk(disks_service, disk)
+    except Exception as e:
+        if '409' not in ' '.join(e.args):
+            raise
+
+
+def get_resource(service, name):
+    try:
+        resource = service.list(search='name={}'.format(name))
+    except TypeError:
+        # Not all resource types allow the search parameter
+        # In this case, will have to manually filter
+        resource = list(filter(lambda x: x.name == name, service.list()))
+    return resource[0] if resource else None
 
 
 def create_disk(disks_service, disk_name, disk_size, storage_domain):
-    disk = disks_service.add(
+    return get_resource(disks_service, disk_name) or disks_service.add(
         types.Disk(
             name=disk_name,
             bootable=True,
@@ -45,10 +59,6 @@ def create_disk(disks_service, disk_name, disk_size, storage_domain):
             ]
         )
     )
-    # Wait till the disk is completely created:
-    disk_service = disks_service.disk_service(disk.id)
-
-    return disk_service.get()
 
 
 def wait_for_disk(disks_service, disk):
