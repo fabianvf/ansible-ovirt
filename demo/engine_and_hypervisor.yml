@@ -1,0 +1,143 @@
+---
+
+data_storage_address: nfs.example.org
+data_storage_path: /nfs_data/ovirt_storage
+data_storage_name: my_data_storage
+export_storage_name: my_export_storage
+admin_password: changeme
+cluster_name: Default
+export_storage_address: nfs.example.org
+export_storage_path: /nfs_data/export
+hosted_storage_address: nfs.example.org
+hosted_storage_path: /nfs_data/self_hosted
+engine_db_host: x1.example.org
+engine_fqdn: x1.example.org
+engine_username: admin@internal
+gateway: 192.168.70.1
+mac_address_range: 00:11:23:00:00:00,00:11:23:FF:FF:FF
+mac_pool_name: macncheese
+firewall_manager: firewalld
+config_dir: /etc/ansible-ovirt
+create_export_domain: true
+vms:
+  - name: test-master1
+    disks:
+      - name: test1disk
+        size: 30
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test1disk2
+        size: 30
+    memory: 8192MiB
+    cpus: 4
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.51
+      netmask: 255.255.255.0
+  - name: test-master2
+    disks:
+      - name: test2disk
+        size: 30
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test2disk2
+        size: 30
+    memory: 8192MiB
+    cpus: 4
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.52
+      netmask: 255.255.255.0
+  - name: test-master3
+    disks:
+      - name: test3disk
+        size: 30
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test3disk2
+        size: 30
+    memory: 8192MiB
+    cpus: 4
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.53
+      netmask: 255.255.255.0
+      mac: '52:11:11:11:11:11'
+  - name: test-node1
+    disks:
+      - name: test4disk
+        size: 20
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test4disk2
+        size: 30
+    memory: 2048MiB
+    cpus: 2
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.54
+      netmask: 255.255.255.0
+  - name: test-node2
+    disks:
+      - name: test5disk
+        size: 20
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test5disk2
+        size: 30
+    memory: 2048MiB
+    cpus: 2
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.55
+      netmask: 255.255.255.0
+  - name: test-node3
+    disks:
+      - name: test6disk
+        size: 20
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test6disk2
+        size: 30
+    memory: 2048MiB
+    cpus: 2
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.56
+      netmask: 255.255.255.0
+  - name: test-ha1
+    disks:
+      - name: test7disk
+        size: 20
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test7disk2
+        size: 30
+    memory: 2048MiB
+    cpus: 2
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.57
+      netmask: 255.255.255.0
+  - name: test-ha2
+    disks:
+      - name: test8disk
+        size: 20
+        image_path: /root/rhel7.qcow2
+        bootable: True
+      - name: test8disk2
+        size: 30
+    memory: 2048MiB
+    cpus: 2
+    nic:
+      boot_protocol: static
+      gateway: 192.168.70.1
+      ip: 192.168.70.58
+      netmask: 255.255.255.0
