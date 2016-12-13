@@ -1,0 +1,14 @@
+---
+
+- name: Get certificate from Satellite
+  yum: name=http://{{ satellite_fqdn }}/pub/katello-ca-consumer-latest.noarch.rpm state=present
+
+- name: Register to Satellite
+  redhat_subscription:
+    server_hostname: '{{ satellite_fqdn }}'
+    activationkey: '{{ activation_key }}'
+    org_id: '{{ organization }}'
+    state: present
+
+- name: Install katello-agent
+  yum: name=katello-agent state=present

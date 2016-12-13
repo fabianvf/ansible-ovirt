@@ -1,0 +1,5 @@
+---
+
+satellite_fqdn: satellite.example.com
+activation_key: test
+organization: Default_Organization

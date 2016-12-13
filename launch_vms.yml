@@ -1,9 +1,13 @@
 ---
 
 - hosts: engine
-  strategy: debug
   remote_user: root
   pre_tasks:
+    - name: install packages
+      yum: name={{ item }} state=present
+      with_items: '{{ packages }}'
+      when: '{{ packages|length > 0 }}'
+
     - name: authenticate to engine
       ovirt_auth:
         username: '{{ engine_username }}'
@@ -11,5 +15,34 @@
         url: https://{{ engine_fqdn }}/ovirt-engine/api
         insecure: true
   roles:
-    - wait_for_host_up
     - { role: launch_vms, when: '{{ vms is defined }}' }
+  post_tasks:
+    - name: add created vms to the inventory
+      add_host:
+        groups: created_vms
+        name: '{{ item.name }}'
+        username: '{{ item.username if item.get("username") else username }}'
+      with_items: '{{ vms }}'
+      when: '{{ vms is defined }}'
+
+
+- hosts: created_vms
+  remote_user: '{{ username }}'
+  gather_facts: no
+  roles:
+    - { role: wait_for_host_up, timeout: 600 }
+
+- hosts: created_vms
+  remote_user: '{{ username }}'
+  become: true
+  pre_tasks:
+    - name: copy public and private keys to created vms
+      copy: src={{ item.src }} dest={{ item.dest }}
+      with_items:
+        - src: '{{ ssh_private_key_path }}'
+          dest: '~/.ssh/id_rsa'
+        - src: '{{ ssh_public_key_path }}'
+          dest: '~/.ssh/id_rsa.pub'
+  roles:
+    - { role: satellite_registration, when: '{{ register_to_satellite }}' }
+    - { role: subscription, when: '{{ repositories|length > 0 }}' }

@@ -9,7 +9,7 @@ Source0:    %{name}-%{version}.tar.gz
 
 BuildArch:  noarch
 
-Requires:  ansible >= 2.1
+Requires:  ansible >= 2.2
 
 %description
 Ansible module for installing and configuring Ovirt/RHV (engine + hypervisor or self-hosted scenarios)

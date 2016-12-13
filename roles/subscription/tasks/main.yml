@@ -7,4 +7,14 @@
   command: subscription-manager repos --disable=*
 
 - name: enable repos
-  command: subscription-manager repos --enable {{ repositories | join(' --enable ')}}
+  command: subscription-manager repos --enable {{ repositories | join(' --enable ')}} --enable jb-eap-7-for-rhel-7-server-rpms
+
+- name: create rhev repo
+  copy:
+    content: |
+      [rhev]
+      name=rhev
+      baseurl=http://bob.eng.lab.tlv.redhat.com/builds/latest_4.0/el7Server/
+      enabled=1
+      gpgcheck=0
+    dest: /etc/yum.repos.d/rhev.repo

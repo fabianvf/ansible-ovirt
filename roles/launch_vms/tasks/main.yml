@@ -99,7 +99,7 @@
         mac_address: '{{ item.nic.mac if item.get("nic") and item.nic.get("mac") else None }}'
     cloud_init:
       host_name: '{{ item.name }}'
-      user_name: '{{ item.username if item.get("username") else "root" }}'
+      user_name: '{{ item.username if item.get("username") else username }}'
       root_password: '{{ item.password if item.get("password") else root_password }}'
       nic_boot_protocol: '{{ item.nic.boot_protocol if item.get("nic") and item.nic.get("boot_protocol") else "DHCP" }}'
       nic_name: '{{ item.nic.name if item.get("nic") and item.nic.get("name") else "eth0" }}'
@@ -107,6 +107,7 @@
       nic_gateway: '{{ item.nic.gateway if item.get("nic") and item.nic.get("boot_protocol") == "static" else None }}'
       nic_netmask: '{{ item.nic.netmask if item.get("nic") and item.nic.get("boot_protocol") == "static" else None }}'
       nic_on_boot: true
+      dns_servers: '{{ nameservers if nameservers is defined else None }}'
       authorized_ssh_keys: '{{ ssh_key }}'
       custom_script: |
         runcmd:

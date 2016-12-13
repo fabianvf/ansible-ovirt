@@ -1,7 +1,7 @@
 ---
 
 - name: wait for SSH to respond on host
-  local_action: wait_for port=22 host={{ inventory_hostname }}
+  local_action: wait_for port=22 host={{ inventory_hostname }} timeout={{ timeout if timeout is defined else 300 }}
 
 
 - name: Gather facts
