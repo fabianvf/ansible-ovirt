@@ -35,14 +35,6 @@
 - hosts: created_vms
   remote_user: '{{ username }}'
   become: true
-  pre_tasks:
-    - name: copy public and private keys to created vms
-      copy: src={{ item.src }} dest={{ item.dest }}
-      with_items:
-        - src: '{{ ssh_private_key_path }}'
-          dest: '~/.ssh/id_rsa'
-        - src: '{{ ssh_public_key_path }}'
-          dest: '~/.ssh/id_rsa.pub'
   roles:
     - { role: satellite_registration, when: '{{ register_to_satellite }}' }
     - { role: subscription, when: '{{ repositories|length > 0 }}' }
