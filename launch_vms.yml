@@ -29,12 +29,8 @@
 - hosts: created_vms
   remote_user: '{{ username }}'
   gather_facts: no
-  roles:
-    - { role: wait_for_host_up, timeout: 600 }
-
-- hosts: created_vms
-  remote_user: '{{ username }}'
   become: true
   roles:
+    - { role: wait_for_host_up, timeout: 600 }
     - { role: satellite_registration, when: '{{ register_to_satellite }}' }
     - { role: subscription, when: '{{ repositories|length > 0 }}' }
